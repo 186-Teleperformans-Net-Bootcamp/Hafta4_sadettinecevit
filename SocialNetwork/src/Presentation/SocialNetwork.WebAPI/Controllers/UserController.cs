@@ -82,7 +82,7 @@ namespace SocialNetwork.WebAPI.Controllers
 
         [HttpPost("Register")]
         [AllowAnonymous]
-        public async Task<IActionResult> Add(UserDTO userDTO, string password)
+        public async Task<IActionResult> Add(UserDTO userDTO)
         {
             IActionResult retVal = null;
             User user = new User()
@@ -93,7 +93,7 @@ namespace SocialNetwork.WebAPI.Controllers
                 LastName = userDTO.Lastname
             };
 
-            IdentityResult result = _userManager.CreateAsync(user, password).Result;
+            IdentityResult result = _userManager.CreateAsync(user, userDTO.Password).Result;
 
             if (result.Succeeded)
             {
