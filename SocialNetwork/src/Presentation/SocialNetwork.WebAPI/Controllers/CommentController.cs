@@ -1,8 +1,13 @@
-﻿using Microsoft.AspNetCore.Authorization;
+﻿using MediatR;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using SocialNetwork.Application.Interfaces.Repositories;
 using SocialNetwork.Domain.Entities;
+using SocialNetwork.Persistence.DAL.CQRS.Commands.Request;
+using SocialNetwork.Persistence.DAL.CQRS.Commands.Response;
+using SocialNetwork.Persistence.DAL.CQRS.Queries.Request;
+using SocialNetwork.Persistence.DAL.CQRS.Queries.Response;
 
 namespace SocialNetwork.WebAPI.Controllers
 {
@@ -11,34 +16,28 @@ namespace SocialNetwork.WebAPI.Controllers
     [Authorize]
     public class CommentController : ControllerBase
     {
-        readonly ICommentRepository _commentRepository;
-        public CommentController(ICommentRepository commentRepository) => _commentRepository = commentRepository;
+        private readonly ICommentRepository _commentRepository;
+        private readonly IMediator _mediator;
+        public CommentController(ICommentRepository commentRepository, IMediator mediator) =>
+            (_commentRepository, _mediator) = (commentRepository, mediator);
 
         [HttpGet("GetAllComment")]
-        public async Task<IActionResult> GetAll()
+        public async Task<IActionResult> GetAll([FromQuery] GetAllCommentQueryRequest request)
         {
             IActionResult retVal = null;
-            List<Comment>? result = await _commentRepository.GetAsync();
+            List<GetAllCommentQueryResponse> result = await _mediator.Send(request);
 
-            if(result == null)
-            {
-                retVal = BadRequest();
-            }
-            else
-            {
-                retVal = Ok(result);
-            }
-
+            retVal = Ok(result);
             return retVal;
         }
 
         [HttpGet("GetCommentById/{id}")]
-        public async Task<IActionResult> GetById(string id)
+        public async Task<IActionResult> GetById([FromQuery] GetByIdCommentQueryRequest request)
         {
             IActionResult retVal = null;
-            Comment? result = await _commentRepository.GetByIdAsync(id);
+            GetByIdCommentQueryResponse result = await _mediator.Send(request);
 
-            if(result == null)
+            if (result == null)
             {
                 retVal = BadRequest();
             }
@@ -51,12 +50,12 @@ namespace SocialNetwork.WebAPI.Controllers
         }
 
         [HttpPost("AddComment")]
-        public async Task<IActionResult> Add(Comment comment)
+        public async Task<IActionResult> Add([FromBody] CreateCommentCommandRequest request)
         {
-            Comment result = await _commentRepository.Add(comment);
+            CreateCommentCommandResponse result = await _mediator.Send(request);
 
             IActionResult retVal = null;
-            if(result != null)
+            if (result.IsSuccess)
             {
                 retVal = Ok(result);
             }
@@ -67,14 +66,14 @@ namespace SocialNetwork.WebAPI.Controllers
 
             return retVal;
         }
-                
+
         [HttpPut("UpdateComment")]
         public async Task<IActionResult> Update(Comment comment)
         {
             Comment result = await _commentRepository.Update(comment);
 
             IActionResult retVal = null;
-            if(result != null)
+            if (result != null)
             {
                 retVal = Ok(result);
             }
@@ -85,14 +84,14 @@ namespace SocialNetwork.WebAPI.Controllers
 
             return retVal;
         }
-                
+
         [HttpDelete("DeleteComment")]
-        public async Task<IActionResult> Delete(Comment comment)
+        public async Task<IActionResult> Delete([FromQuery] DeleteCommentCommandRequest request)
         {
-            Comment result = await _commentRepository.Delete(comment);
+            DeleteCommentCommandResponse result = await _mediator.Send(request);
 
             IActionResult retVal = null;
-            if(result != null)
+            if (result.IsSuccess)
             {
                 retVal = Ok(result);
             }
@@ -104,6 +103,6 @@ namespace SocialNetwork.WebAPI.Controllers
             return retVal;
         }
 
-        
+
     }
 }

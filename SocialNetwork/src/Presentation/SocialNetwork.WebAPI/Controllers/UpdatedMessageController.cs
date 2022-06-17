@@ -1,7 +1,12 @@
-﻿using Microsoft.AspNetCore.Authorization;
+﻿using MediatR;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using SocialNetwork.Application.Interfaces.Repositories;
 using SocialNetwork.Domain.Entities;
+using SocialNetwork.Persistence.DAL.CQRS.Commands.Request;
+using SocialNetwork.Persistence.DAL.CQRS.Commands.Response;
+using SocialNetwork.Persistence.DAL.CQRS.Queries.Request;
+using SocialNetwork.Persistence.DAL.CQRS.Queries.Response;
 
 namespace SocialNetwork.WebAPI.Controllers
 {
@@ -11,54 +16,42 @@ namespace SocialNetwork.WebAPI.Controllers
     public class UpdatedMessageController : ControllerBase
     {
         readonly IUpdatedMessageRepository _updatedMessageRepository;
-        public UpdatedMessageController(IUpdatedMessageRepository updatedMessageRepository)
+        readonly IMediator _mediator;
+        public UpdatedMessageController(IUpdatedMessageRepository updatedMessageRepository, IMediator mediator)
         {
+            _mediator = mediator;
             _updatedMessageRepository = updatedMessageRepository;
         }
 
         [HttpGet("GetUpdatedMessagesById/{id}")]
-        public async Task<IActionResult> GetById(string id)
+        public async Task<IActionResult> GetById([FromQuery] GetByIdUpdatedMessageQueryRequest request)
         {
             IActionResult retVal = null;
-            UpdatedMessage result = await _updatedMessageRepository.GetByIdAsync(id);
 
-            if (result == null)
-            {
-                retVal = BadRequest();
-            }
-            else
-            {
-                retVal = Ok(result);
-            }
+            GetByIdUpdatedMessageQueryResponse result = await _mediator.Send(request);
+
+            retVal = Ok(result);
 
             return retVal;
         }
 
         [HttpGet("GetAllUpdatedMessages")]
-        public async Task<IActionResult> GetAll()
+        public async Task<IActionResult> GetAll([FromQuery] GetAllUpdatedMessageQueryRequest request)
         {
             IActionResult retVal = null;
-            List<UpdatedMessage> result = await _updatedMessageRepository.GetAsync();
-
-            if (result == null)
-            {
-                retVal = BadRequest();
-            }
-            else
-            {
-                retVal = Ok(result);
-            }
+            List<GetAllUpdatedMessageQueryResponse> result = await _mediator.Send(request);
+            retVal = Ok(result);
 
             return retVal;
         }
 
         [HttpPost("AddUpdatedMessage")]
-        public async Task<IActionResult> Add(UpdatedMessage updatedMessage)
+        public async Task<IActionResult> Add([FromBody] CreateUpdatedMessageCommandRequest request)
         {
-            UpdatedMessage result = await _updatedMessageRepository.Add(updatedMessage);
+            CreateUpdatedMessageCommandResponse result = await _mediator.Send(request);
 
             IActionResult retVal = null;
-            if (result != null)
+            if (result.IsSuccess)
             {
                 retVal = Ok(result);
             }
@@ -89,12 +82,12 @@ namespace SocialNetwork.WebAPI.Controllers
         }
 
         [HttpDelete("DeleteUpdatedMessage")]
-        public async Task<IActionResult> Delete(UpdatedMessage updatedMessage)
+        public async Task<IActionResult> Delete([FromQuery] DeleteUpdatedMessageCommandRequest request)
         {
-            UpdatedMessage result = await _updatedMessageRepository.Delete(updatedMessage);
+            DeleteUpdatedMessageCommandResponse result = await _mediator.Send(request);
 
             IActionResult retVal = null;
-            if (result != null)
+            if (result.IsSuccess)
             {
                 retVal = Ok(result);
             }

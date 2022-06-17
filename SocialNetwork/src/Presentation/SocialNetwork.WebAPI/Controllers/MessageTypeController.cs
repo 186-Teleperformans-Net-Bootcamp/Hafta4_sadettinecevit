@@ -1,31 +1,39 @@
-﻿using Microsoft.AspNetCore.Authorization;
+﻿using MediatR;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Caching.Memory;
 using SocialNetwork.Application.Interfaces.Repositories;
 using SocialNetwork.Domain.Entities;
+using SocialNetwork.Persistence.DAL.CQRS.Commands.Request;
+using SocialNetwork.Persistence.DAL.CQRS.Commands.Response;
+using SocialNetwork.Persistence.DAL.CQRS.Queries.Request;
+using SocialNetwork.Persistence.DAL.CQRS.Queries.Response;
 
 namespace SocialNetwork.WebAPI.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
-//    [Authorize]
+    //    [Authorize]
     public class MessageTypeController : ControllerBase
     {
         private readonly IMessageTypeRepository _messageTypeRepository;
         private readonly IMemoryCache _memoryCache;
-        public MessageTypeController(IMessageTypeRepository messageTypeRepository, 
-            IMemoryCache memoryCache)
+        private readonly IMediator _mediator;
+
+        public MessageTypeController(IMessageTypeRepository messageTypeRepository,
+            IMemoryCache memoryCache, IMediator mediator)
         {
             _messageTypeRepository = messageTypeRepository;
             _memoryCache = memoryCache;
+            _mediator = mediator;
         }
 
         [HttpGet("GetMessageTypeById/{id}")]
-        public async Task<IActionResult> GetById(string id)
+        public async Task<IActionResult> GetById([FromQuery] GetByIdMessageTypeQueryRequest request)
         {
             IActionResult retVal = null;
-            MessageType result = await _messageTypeRepository.GetByIdAsync(id);
+            GetByIdMessageTypeQueryResponse result = await _mediator.Send(request);
 
             if (result == null)
             {
@@ -40,46 +48,37 @@ namespace SocialNetwork.WebAPI.Controllers
         }
 
         [HttpGet("GetAllMessageType")]
-        public async Task<IActionResult> GetAll()
+        public async Task<IActionResult> GetAll([FromQuery] GetAllMessageTypeQueryRequest request)
         {
-            List<MessageType> result = null;
+            List<GetAllMessageTypeQueryResponse> result = null;
             IActionResult retVal = null;
 
-            if (!_memoryCache.TryGetValue("messageType", out result))
+            if (!_memoryCache.TryGetValue("messageTypes", out result))
             {
-                result = await _messageTypeRepository.GetAsync();
+                result = await _mediator.Send(request);
 
-                if (result == null)
-                {
-                    retVal = BadRequest();
-                }
-                else
-                {
-                    retVal = Ok(result);
+                MemoryCacheEntryOptions memoryCacheEntryOptions = new MemoryCacheEntryOptions();
+                memoryCacheEntryOptions.AbsoluteExpirationRelativeToNow = TimeSpan.FromHours(1);
+                memoryCacheEntryOptions.SlidingExpiration = TimeSpan.FromMinutes(30);
+                memoryCacheEntryOptions.Priority = CacheItemPriority.Normal;
 
-                    MemoryCacheEntryOptions memoryCacheEntryOptions = new MemoryCacheEntryOptions();
-                    memoryCacheEntryOptions.AbsoluteExpirationRelativeToNow = TimeSpan.FromHours(1);
-                    memoryCacheEntryOptions.SlidingExpiration = TimeSpan.FromMinutes(30);
-                    memoryCacheEntryOptions.Priority = CacheItemPriority.Normal;
-
-                    _memoryCache.Set("messageType", result, memoryCacheEntryOptions);
-                }
+                _memoryCache.Set("messageTypes", result, memoryCacheEntryOptions);
             }
-            else
-            {
-                retVal = Ok(result);
-            }
+
+            retVal = Ok(result);
+
             return retVal;
         }
 
         [HttpPost("AddMessageType")]
-        public async Task<IActionResult> Add(MessageType messageType)
+        public async Task<IActionResult> Add([FromBody] CreateMessageTypeCommandRequest request)
         {
-            MessageType result = await _messageTypeRepository.Add(messageType);
+            CreateMessageTypeCommandResponse result = await _mediator.Send(request);
 
             IActionResult retVal = null;
-            if (result != null)
+            if (result.IsSuccess)
             {
+                _memoryCache.Remove("messageTypes");
                 retVal = Ok(result);
             }
             else
@@ -98,6 +97,7 @@ namespace SocialNetwork.WebAPI.Controllers
             IActionResult retVal = null;
             if (result != null)
             {
+                _memoryCache.Remove("messageTypes");
                 retVal = Ok(result);
             }
             else
@@ -109,12 +109,12 @@ namespace SocialNetwork.WebAPI.Controllers
         }
 
         [HttpDelete("DeleteMessageType")]
-        public async Task<IActionResult> Delete(MessageType messageType)
+        public async Task<IActionResult> Delete(DeleteMessageCommandRequest request)
         {
-            MessageType result = await _messageTypeRepository.Delete(messageType);
+            DeleteMessageCommandResponse result = await _mediator.Send(request);
 
             IActionResult retVal = null;
-            if (result != null)
+            if (result.IsSuccess)
             {
                 retVal = Ok(result);
             }

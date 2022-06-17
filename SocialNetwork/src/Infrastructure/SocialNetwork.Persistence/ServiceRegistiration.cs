@@ -7,6 +7,7 @@ using SocialNetwork.Domain.Entities;
 using SocialNetwork.Persistence.Context;
 using SocialNetwork.Persistence.Repository;
 using Microsoft.Extensions.DependencyInjection;
+using MediatR;
 
 namespace SocialNetwork.Persistence
 {
@@ -16,6 +17,8 @@ namespace SocialNetwork.Persistence
         {
             serviceCollection.AddDbContext<ApplicationDbContext>(options =>
                 options.UseSqlServer(configuration?.GetConnectionString("Default")));
+
+            serviceCollection.AddMediatR(typeof(ApplicationDbContext));
 
             serviceCollection.AddTransient<ICommentRepository, CommentRepository>();
             serviceCollection.AddTransient<IFriendRepository, FriendRepository>();

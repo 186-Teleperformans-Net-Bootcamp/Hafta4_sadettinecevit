@@ -1,7 +1,12 @@
-﻿using Microsoft.AspNetCore.Authorization;
+﻿using MediatR;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using SocialNetwork.Application.Interfaces.Repositories;
 using SocialNetwork.Domain.Entities;
+using SocialNetwork.Persistence.DAL.CQRS.Commands.Request;
+using SocialNetwork.Persistence.DAL.CQRS.Commands.Response;
+using SocialNetwork.Persistence.DAL.CQRS.Queries.Request;
+using SocialNetwork.Persistence.DAL.CQRS.Queries.Response;
 
 namespace SocialNetwork.WebAPI.Controllers
 {
@@ -10,19 +15,22 @@ namespace SocialNetwork.WebAPI.Controllers
     [Authorize]
     public class FriendRequestController : ControllerBase
     {
-        readonly IFriendRequestRepository _friendRequestRepository;
-        readonly IFriendRepository _friendRepository;
-        public FriendRequestController(IFriendRequestRepository friendRequestRepository, IFriendRepository friendRepository)
+        private readonly IFriendRequestRepository _friendRequestRepository;
+        private readonly IFriendRepository _friendRepository;
+        private readonly IMediator _mediator;
+        public FriendRequestController(IFriendRequestRepository friendRequestRepository,
+            IFriendRepository friendRepository, IMediator mediator)
         {
+            _mediator = mediator;
             _friendRepository = friendRepository;
             _friendRequestRepository = friendRequestRepository;
         }
 
         [HttpGet("GetFriendRequestById/{id}")]
-        public async Task<IActionResult> GetById(string id)
+        public async Task<IActionResult> GetById([FromQuery] GetByIdFriendRequestQueryRequest request)
         {
             IActionResult retVal = null;
-            FriendRequest result = await _friendRequestRepository.GetByIdAsync(id);
+            GetByIdFriendRequestQueryResponse result = await _mediator.Send(request);
 
             if (result == null)
             {
@@ -37,30 +45,23 @@ namespace SocialNetwork.WebAPI.Controllers
         }
 
         [HttpGet("GetAllFrienRequest")]
-        public async Task<IActionResult> GetAll()
+        public async Task<IActionResult> GetAll([FromQuery] GetAllFriendRequestQueryRequest request)
         {
             IActionResult retVal = null;
-            List<FriendRequest> result = await _friendRequestRepository.GetAsync();
+            List<GetAllFriendRequestQueryResponse> result = await _mediator.Send(request);
 
-            if (result == null)
-            {
-                retVal = BadRequest();
-            }
-            else
-            {
-                retVal = Ok(result);
-            }
+            retVal = Ok(result);
 
             return retVal;
         }
 
         [HttpPost("AddFriendRequest")]
-        public async Task<IActionResult> Add(FriendRequest friendRequest)
+        public async Task<IActionResult> Add([FromBody] CreateFriendRequestCommandRequest request)
         {
-            FriendRequest result = await _friendRequestRepository.Add(friendRequest);
+            CreateFriendRequestCommandResponse result = await _mediator.Send(request);
 
             IActionResult retVal = null;
-            if (result != null)
+            if (result.IsSuccess)
             {
                 retVal = Ok(result);
             }
@@ -115,12 +116,12 @@ namespace SocialNetwork.WebAPI.Controllers
         }
 
         [HttpDelete("DeleteFriendRequest")]
-        public async Task<IActionResult> Delete(FriendRequest friendRequest)
+        public async Task<IActionResult> Delete([FromQuery] DeleteFriendRequestCommandRequest request)
         {
-            FriendRequest result = await _friendRequestRepository.Delete(friendRequest);
+            DeleteFriendRequestCommandResponse result = await _mediator.Send(request);
 
             IActionResult retVal = null;
-            if (result != null)
+            if (result.IsSuccess)
             {
                 retVal = Ok(result);
             }

@@ -1,7 +1,12 @@
-﻿using Microsoft.AspNetCore.Authorization;
+﻿using MediatR;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using SocialNetwork.Application.Interfaces.Repositories;
 using SocialNetwork.Domain.Entities;
+using SocialNetwork.Persistence.DAL.CQRS.Commands.Request;
+using SocialNetwork.Persistence.DAL.CQRS.Commands.Response;
+using SocialNetwork.Persistence.DAL.CQRS.Queries.Request;
+using SocialNetwork.Persistence.DAL.CQRS.Queries.Response;
 
 namespace SocialNetwork.WebAPI.Controllers
 {
@@ -10,17 +15,20 @@ namespace SocialNetwork.WebAPI.Controllers
     [Authorize]
     public class GroupMemberController : ControllerBase
     {
-        readonly IGroupMemberRepository _groupMemberRepository;
-        public GroupMemberController(IGroupMemberRepository groupMemberRepository)
+        private readonly IMediator _mediator;
+        private readonly IGroupMemberRepository _groupMemberRepository;
+        public GroupMemberController(IGroupMemberRepository groupMemberRepository, IMediator mediator)
         {
+            _mediator = mediator;
             _groupMemberRepository = groupMemberRepository;
         }
 
         [HttpGet("GetGroupMemberById/{id}")]
-        public async Task<IActionResult> GetById(string id)
+        public async Task<IActionResult> GetById([FromQuery] GetByIdGroupMemberQueryRequest request)
         {
+
             IActionResult retVal = null;
-            GroupMember result = await _groupMemberRepository.GetByIdAsync(id);
+            GetByIdGroupMemberQueryResponse result = await _mediator.Send(request);
 
             if (result == null)
             {
@@ -35,30 +43,24 @@ namespace SocialNetwork.WebAPI.Controllers
         }
 
         [HttpGet("GetAllGroupMember")]
-        public async Task<IActionResult> GetAll()
+        public async Task<IActionResult> GetAll([FromQuery] GetAllGroupMemberQueryRequest request)
         {
             IActionResult retVal = null;
-            List<GroupMember> result = await _groupMemberRepository.GetAsync();
 
-            if (result == null)
-            {
-                retVal = BadRequest();
-            }
-            else
-            {
-                retVal = Ok(result);
-            }
+            List<GetAllGroupMemberQueryResponse> result = await _mediator.Send(request);
 
+            retVal = Ok(result);
+        
             return retVal;
         }
 
         [HttpPost("AddGroupMember")]
-        public async Task<IActionResult> Add(GroupMember groupMember)
+        public async Task<IActionResult> Add([FromBody] CreateGroupMemberCommandRequest request)
         {
-            GroupMember result = await _groupMemberRepository.Add(groupMember);
+            CreateGroupMemberCommandResponse result = await _mediator.Send(request);
 
             IActionResult retVal = null;
-            if (result != null)
+            if (result.IsSuccess)
             {
                 retVal = Ok(result);
             }
@@ -89,12 +91,12 @@ namespace SocialNetwork.WebAPI.Controllers
         }
 
         [HttpDelete("DeleteGroupMember")]
-        public async Task<IActionResult> Delete(GroupMember groupMember)
+        public async Task<IActionResult> Delete([FromQuery] DeleteGroupMemberCommandRequest request)
         {
-            GroupMember result = await _groupMemberRepository.Delete(groupMember);
+            DeleteGroupMemberCommandResponse result = await _mediator.Send(request);
 
             IActionResult retVal = null;
-            if (result != null)
+            if (result.IsSuccess)
             {
                 retVal = Ok(result);
             }

@@ -1,11 +1,15 @@
-﻿using Microsoft.AspNetCore.Authorization;
+﻿using MediatR;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Caching.Distributed;
 using SocialNetwork.Application.Dto;
 using SocialNetwork.Application.Interfaces.Repositories;
 using SocialNetwork.Domain.Entities;
-using System.Security.Cryptography;
+using SocialNetwork.Persistence.DAL.CQRS.Commands.Request;
+using SocialNetwork.Persistence.DAL.CQRS.Commands.Response;
+using SocialNetwork.Persistence.DAL.CQRS.Queries.Request;
+using SocialNetwork.Persistence.DAL.CQRS.Queries.Response;
 using System.Text;
 using System.Text.Json;
 
@@ -19,18 +23,22 @@ namespace SocialNetwork.WebAPI.Controllers
         private readonly IUserRepository _userRepository;
         private readonly UserManager<User> _userManager;
         private readonly IDistributedCache _distributedCache;
+        private readonly IMediator _mediator;
         public UserController(IUserRepository userRepository,
-            UserManager<User> userManager, IDistributedCache distributedCache)
+            UserManager<User> userManager, IDistributedCache distributedCache
+            , IMediator mediator)
         {
             _userRepository = userRepository;
             _userManager = userManager;
             _distributedCache = distributedCache;
+            _mediator = mediator;
         }
+
         [HttpGet("GetUserById/{id}")]
-        public async Task<IActionResult> GetById(string id)
+        public async Task<IActionResult> GetById([FromQuery] GetByIdUserQueryRequest request)
         {
             IActionResult retVal = null;
-            User result = await _userRepository.GetByIdAsync(id);
+            GetByIdUserQueryResponse result = await _mediator.Send(request);
 
             if (result == null)
             {
@@ -46,21 +54,21 @@ namespace SocialNetwork.WebAPI.Controllers
 
         [HttpGet("GetAllUsers")]
         [AllowAnonymous]
-        public async Task<IActionResult> GetAll()
+        public async Task<IActionResult> GetAll([FromQuery] GetAllUserQueryRequest request)
         {
             IActionResult retVal = null;
-            List<User> result = null;
+            List<GetAllUserQueryResponse> result = null;
 
             byte[] cachedBytes = _distributedCache.Get("GetAllUsers");
 
             if (cachedBytes == null)
             {
-                result = await _userRepository.GetAsync();
+                result = await _mediator.Send(request);
             }
             else
             {
                 string jsonData = Encoding.UTF8.GetString(cachedBytes);
-                result = JsonSerializer.Deserialize<List<User>>(jsonData);
+                result = JsonSerializer.Deserialize<List<GetAllUserQueryResponse>>(jsonData);
             }
 
             if (result == null)
@@ -82,21 +90,15 @@ namespace SocialNetwork.WebAPI.Controllers
 
         [HttpPost("Register")]
         [AllowAnonymous]
-        public async Task<IActionResult> Add(UserDTO userDTO)
+        public async Task<IActionResult> Add([FromBody] CreateUserCommandRequest request)
         {
             IActionResult retVal = null;
-            User user = new User()
-            {
-                Email = userDTO.Email,
-                UserName = userDTO.UserName,
-                Name = userDTO.Name,
-                LastName = userDTO.Lastname
-            };
 
-            IdentityResult result = _userManager.CreateAsync(user, userDTO.Password).Result;
+            CreateUserCommandResponse result = _mediator.Send(request).Result;
 
-            if (result.Succeeded)
+            if (result.IsSuccess)
             {
+                _distributedCache.RemoveAsync("GetAllUsers");
                 retVal = Ok(result);
             }
             else
@@ -108,13 +110,14 @@ namespace SocialNetwork.WebAPI.Controllers
         }
 
         [HttpPut("UpdateUser")]
-        public async Task<IActionResult> Update(User user)
+        public async Task<IActionResult> Update([FromBody] User user)
         {
             User result = await _userRepository.Update(user);
 
             IActionResult retVal = null;
             if (result != null)
             {
+                _distributedCache.RemoveAsync("GetAllUsers");
                 retVal = Ok(result);
             }
             else
@@ -126,12 +129,13 @@ namespace SocialNetwork.WebAPI.Controllers
         }
 
         [HttpDelete("DeleteUser")]
-        public async Task<IActionResult> Delete(User user)
+        public async Task<IActionResult> Delete([FromQuery] DeleteUserCommandRequest request)
         {
-            User result = await _userRepository.Delete(user);
+            DeleteUserCommandResponse result = await _mediator.Send(request);
 
-            IActionResult retVal = null;
-            if (result != null)
+            IActionResult retVal;
+
+            if (result.IsSuccess)
             {
                 retVal = Ok(result);
             }
